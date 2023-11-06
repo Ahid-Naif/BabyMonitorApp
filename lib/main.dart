@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
+import 'package:flutter_mjpeg/flutter_mjpeg.dart';
 
 void main() {
   runApp(MyApp());
@@ -25,23 +25,13 @@ class StreamAndRecordingsPage extends StatefulWidget {
 }
 
 class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
-  VideoPlayerController? _controller;
   final List<String> _recordings = [];
+  VideoPlayerController? _videoPlayerController;
 
   @override
   void initState() {
     super.initState();
-    _initializeVideoPlayer();
     _fetchRecordings();
-  }
-
-  Future<void> _initializeVideoPlayer() async {
-    _controller = VideoPlayerController.network(
-      'http://192.168.1.103:5000/video_feed',
-    )..initialize().then((_) {
-        setState(() {});
-        _controller!.play();
-      });
   }
 
   Future<void> _fetchRecordings() async {
@@ -50,11 +40,7 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
           Uri.parse('http://192.168.1.103:5000/api/stream_and_recordings'));
       if (response.statusCode == 200) {
         setState(() {
-          List<dynamic> fileList = json.decode(response.body);
-          _recordings.clear();
-          for (var file in fileList) {
-            _recordings.add(file);
-          }
+          _recordings.addAll(List<String>.from(json.decode(response.body)));
         });
       } else {
         _showErrorDialog('Failed to load recordings');
@@ -84,7 +70,7 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _videoPlayerController?.dispose();
     super.dispose();
   }
 
@@ -96,30 +82,30 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
       ),
       body: Column(
         children: [
-          if (_controller != null && _controller!.value.isInitialized)
-            Container(
-              padding: EdgeInsets.all(10),
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
-              ),
+          Expanded(
+            child: Mjpeg(
+              stream: 'http://192.168.1.103:5000/video_feed',
+              error: (context, error, stack) {
+                print(error); // Optionally print the error to the console.
+                return Text('Failed to load the live stream',
+                    style: TextStyle(color: Colors.red));
+              },
             ),
+          ),
           Expanded(
             child: ListView.builder(
               itemCount: _recordings.length,
               itemBuilder: (context, index) {
+                String videoUrl =
+                    'http://192.168.1.103:5000/static/${_recordings[index]}';
                 return ListTile(
                   title: Text('Recording ${index + 1}'),
                   subtitle: Text(_recordings[index]),
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VideoPlaybackScreen(
-                            videoUrl:
-                                'http://192.168.1.103:5000/static/${_recordings[index]}'),
-                      ),
-                    );
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) =>
+                          VideoPlaybackScreen(videoUrl: videoUrl),
+                    ));
                   },
                 );
               },
@@ -148,9 +134,8 @@ class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
     super.initState();
     _controller = VideoPlayerController.network(widget.videoUrl)
       ..initialize().then((_) {
-        setState(() {
-          _controller.play();
-        });
+        setState(() {});
+        _controller.play();
       });
   }
 
