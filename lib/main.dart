@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -12,9 +13,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Camera Stream and Recordings',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
       home: StreamAndRecordingsPage(),
     );
   }
@@ -28,39 +26,66 @@ class StreamAndRecordingsPage extends StatefulWidget {
 
 class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   VideoPlayerController? _controller;
-  List<String> _recordings = [];
+  final List<String> _recordings = [];
 
   @override
   void initState() {
     super.initState();
-    // Start the camera stream video player controller
-    _controller =
-        VideoPlayerController.network('http://192.168.1.103:5000/video_feed')
-          ..initialize().then((_) {
-            setState(() {});
-            _controller!.play();
-          });
-    fetchRecordings();
+    _initializeVideoPlayer();
+    _fetchRecordings();
+  }
+
+  Future<void> _initializeVideoPlayer() async {
+    _controller = VideoPlayerController.network(
+      'http://192.168.1.103:5000/video_feed',
+    )..initialize().then((_) {
+        setState(() {});
+        _controller!.play();
+      });
+  }
+
+  Future<void> _fetchRecordings() async {
+    try {
+      final response = await http.get(
+          Uri.parse('http://192.168.1.103:5000/api/stream_and_recordings'));
+      if (response.statusCode == 200) {
+        setState(() {
+          List<dynamic> fileList = json.decode(response.body);
+          _recordings.clear();
+          for (var file in fileList) {
+            _recordings.add(file);
+          }
+        });
+      } else {
+        _showErrorDialog('Failed to load recordings');
+      }
+    } catch (e) {
+      _showErrorDialog(e.toString());
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Error'),
+        content: Text(message),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Okay'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
     _controller?.dispose();
     super.dispose();
-  }
-
-  Future<void> fetchRecordings() async {
-    final response = await http
-        .get(Uri.parse('http://192.168.1.103:5000/api/stream_and_recordings'));
-    if (response.statusCode == 200) {
-      setState(() {
-        // Assuming your recordings list is just a list of strings
-        // You'll need to adjust this parsing based on the actual structure of your response
-        _recordings = List<String>.from(json.decode(response.body));
-      });
-    } else {
-      throw Exception('Failed to load recordings');
-    }
   }
 
   @override
@@ -70,23 +95,27 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
         title: Text('Camera Stream and Recordings'),
       ),
       body: Column(
-        children: <Widget>[
+        children: [
           if (_controller != null && _controller!.value.isInitialized)
-            AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: VideoPlayer(_controller!),
+            Container(
+              padding: EdgeInsets.all(10),
+              child: AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio,
+                child: VideoPlayer(_controller!),
+              ),
             ),
           Expanded(
             child: ListView.builder(
               itemCount: _recordings.length,
               itemBuilder: (context, index) {
                 return ListTile(
-                  title: Text(_recordings[index]),
+                  title: Text('Recording ${index + 1}'),
+                  subtitle: Text(_recordings[index]),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => VideoPlayerScreen(
+                        builder: (context) => VideoPlaybackScreen(
                             videoUrl:
                                 'http://192.168.1.103:5000/static/${_recordings[index]}'),
                       ),
@@ -102,16 +131,16 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   }
 }
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlaybackScreen extends StatefulWidget {
   final String videoUrl;
 
-  VideoPlayerScreen({required this.videoUrl});
+  VideoPlaybackScreen({Key? key, required this.videoUrl}) : super(key: key);
 
   @override
-  _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
+  _VideoPlaybackScreenState createState() => _VideoPlaybackScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
   late VideoPlayerController _controller;
 
   @override
@@ -119,8 +148,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.initState();
     _controller = VideoPlayerController.network(widget.videoUrl)
       ..initialize().then((_) {
-        setState(() {});
-        _controller.play();
+        setState(() {
+          _controller.play();
+        });
       });
   }
 
@@ -133,7 +163,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Play Video')),
+      appBar: AppBar(
+        title: Text('Video Playback'),
+      ),
       body: Center(
         child: _controller.value.isInitialized
             ? AspectRatio(
