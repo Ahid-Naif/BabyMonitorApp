@@ -36,7 +36,7 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   Future<void> _fetchRecordings() async {
     try {
       final response = await http.get(
-          Uri.parse('http://192.168.1.103:5000/api/stream_and_recordings'));
+          Uri.parse('http://192.168.1.106:5000/api/stream_and_recordings'));
       if (response.statusCode == 200) {
         setState(() {
           _recordings.addAll(List<String>.from(json.decode(response.body)));
@@ -75,18 +75,21 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
       ),
       body: Column(
         children: [
+          // Adjusted the flex property to ensure that the WebView and the ListView are displayed proportionately.
           Expanded(
+            flex: 2, // Giving the WebView less space
             child: WebView(
-              initialUrl: 'http://192.168.1.103:5000/video_feed',
+              initialUrl: 'http://192.168.1.106:5000/video_feed',
               javascriptMode: JavascriptMode.unrestricted,
             ),
           ),
           Expanded(
+            flex: 3, // Giving more space to the ListView for recordings
             child: ListView.builder(
               itemCount: _recordings.length,
               itemBuilder: (context, index) {
                 String videoUrl =
-                    'http://192.168.1.103:5000/static/${_recordings[index]}';
+                    'http://192.168.1.106:5000/static/${_recordings[index]}';
                 return ListTile(
                   title: Text('Recording ${index + 1}'),
                   subtitle: Text(_recordings[index]),
