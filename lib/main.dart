@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
-import 'package:flutter_mjpeg/flutter_mjpeg.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
   runApp(MyApp());
@@ -26,7 +26,6 @@ class StreamAndRecordingsPage extends StatefulWidget {
 
 class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   final List<String> _recordings = [];
-  VideoPlayerController? _videoPlayerController;
 
   @override
   void initState() {
@@ -69,12 +68,6 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   }
 
   @override
-  void dispose() {
-    _videoPlayerController?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -83,13 +76,9 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
       body: Column(
         children: [
           Expanded(
-            child: Mjpeg(
-              stream: 'http://192.168.1.103:5000/video_feed',
-              error: (context, error, stack) {
-                print(error); // Optionally print the error to the console.
-                return Text('Failed to load the live stream',
-                    style: TextStyle(color: Colors.red));
-              },
+            child: WebView(
+              initialUrl: 'http://192.168.1.103:5000/video_feed',
+              javascriptMode: JavascriptMode.unrestricted,
             ),
           ),
           Expanded(
@@ -136,6 +125,8 @@ class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
       ..initialize().then((_) {
         setState(() {});
         _controller.play();
+      }).catchError((error) {
+        print('Error initializing video player: $error');
       });
   }
 
