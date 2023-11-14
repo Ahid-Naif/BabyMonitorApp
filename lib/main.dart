@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -25,27 +26,92 @@ class StreamAndRecordingsPage extends StatefulWidget {
 }
 
 class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
-  final List<String> _recordings = [];
+  String _baseUrl = 'http://192.168.1.106:5000'; // Default URL
+  List<String> _recordings = [];
+  Key _webViewKey = UniqueKey();
 
   @override
   void initState() {
     super.initState();
+    _loadIP();
+  }
+
+  void _deleteAllRecordings() async {
+    // Implement the logic to send a request to the server to delete all recordings
+    // For example, an HTTP DELETE request
+    try {
+      final response =
+          await http.delete(Uri.parse('$_baseUrl/api/delete_all_recordings'));
+      if (response.statusCode == 200) {
+        setState(() {
+          _recordings
+              .clear(); // Clear the recordings list on successful deletion
+        });
+      } else {
+        _showErrorDialog('Failed to delete recordings');
+      }
+    } catch (e) {
+      _showErrorDialog(e.toString());
+    }
+  }
+
+  void _reloadWebView() {
+    setState(() {
+      _webViewKey = UniqueKey(); // Reset the WebView key to force reload
+    });
+  }
+
+  void _refresh() {
+    setState(() {
+      // Clear the recordings list before fetching new data
+      _recordings.clear();
+
+      // Reset the WebView key to force it to reload
+      _webViewKey = UniqueKey();
+    });
+
+    // Re-fetch the recordings
+    _fetchRecordings();
+  }
+
+  Future<void> _loadIP() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? savedIP = prefs.getString('serverIP');
+    if (savedIP != null) {
+      setState(() {
+        _baseUrl = 'http://$savedIP:5000';
+      });
+    }
     _fetchRecordings();
   }
 
   Future<void> _fetchRecordings() async {
     try {
-      final response = await http.get(
-          Uri.parse('http://192.168.1.106:5000/api/stream_and_recordings'));
+      final response =
+          await http.get(Uri.parse('$_baseUrl/api/stream_and_recordings'));
       if (response.statusCode == 200) {
         setState(() {
-          _recordings.addAll(List<String>.from(json.decode(response.body)));
+          _recordings = List<String>.from(json.decode(response.body));
         });
       } else {
         _showErrorDialog('Failed to load recordings');
       }
     } catch (e) {
       _showErrorDialog(e.toString());
+    }
+  }
+
+  void _navigateToSettings() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => SettingsScreen()),
+    );
+
+    if (result != null && result is String) {
+      setState(() {
+        _baseUrl = 'http://$result:5000';
+        _webViewKey = UniqueKey(); // Reset the WebView key
+      });
+      _fetchRecordings();
     }
   }
 
@@ -71,25 +137,46 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Camera Stream and Recordings'),
+        title: Text(
+            'Recordings (${_recordings.length})'), // Display the count of recordings
+        actions: [
+          IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: _recordings.isNotEmpty
+                ? _deleteAllRecordings
+                : null, // Disable if no recordings
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _refresh,
+          ),
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: _navigateToSettings,
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Adjusted the flex property to ensure that the WebView and the ListView are displayed proportionately.
           Expanded(
-            flex: 2, // Giving the WebView less space
+            flex: 2,
             child: WebView(
-              initialUrl: 'http://192.168.1.106:5000/video_feed',
+              key: _webViewKey,
+              initialUrl: '$_baseUrl/video_feed',
               javascriptMode: JavascriptMode.unrestricted,
+              onWebResourceError: (error) {
+                // Log the error and consider providing a way to reload the WebView
+                print("WebView error: ${error.description}");
+                _reloadWebView(); // Reload WebView on error
+              },
             ),
           ),
           Expanded(
-            flex: 3, // Giving more space to the ListView for recordings
+            flex: 3,
             child: ListView.builder(
               itemCount: _recordings.length,
               itemBuilder: (context, index) {
-                String videoUrl =
-                    'http://192.168.1.106:5000/static/${_recordings[index]}';
+                String videoUrl = '$_baseUrl/static/${_recordings[index]}';
                 return ListTile(
                   title: Text('Recording ${index + 1}'),
                   subtitle: Text(_recordings[index]),
@@ -104,6 +191,62 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  @override
+  _SettingsScreenState createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final TextEditingController _ipController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIP();
+  }
+
+  void _loadIP() async {
+    final prefs = await SharedPreferences.getInstance();
+    _ipController.text = prefs.getString('serverIP') ?? '';
+  }
+
+  void _saveSettings() async {
+    final String ip = _ipController.text;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('serverIP', ip);
+    Navigator.of(context).pop(ip);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Settings'),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _ipController,
+              decoration: InputDecoration(
+                labelText: 'Server IP Address',
+                hintText: 'e.g., 192.168.1.106',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _saveSettings,
+              child: Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
   }
