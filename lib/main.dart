@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() {
   runApp(MyApp());
@@ -29,11 +31,37 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   String _baseUrl = 'http://192.168.1.106:5000'; // Default URL
   List<String> _recordings = [];
   Key _webViewKey = UniqueKey();
+  Timer? timer;
+  NotificationsServices notificationsServices = NotificationsServices();
 
   @override
   void initState() {
     super.initState();
     _loadIP();
+    notificationsServices.initializeNotifications();
+    _startPeriodicCheck();
+  }
+
+  void _startPeriodicCheck() {
+    timer = Timer.periodic(Duration(seconds: 10), (Timer t) async {
+      try {
+        var response = await http.get(Uri.parse('$_baseUrl/api/check-danger'));
+        if (response.statusCode == 200 && json.decode(response.body) == true) {
+          notificationsServices.sendNotification(
+            'Danger!!!',
+            'Baby might be suffocating.',
+          );
+        }
+      } catch (e) {
+        print("Error: $e");
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
   }
 
   void _deleteAllRecordings() async {
@@ -311,5 +339,34 @@ class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
         ),
       ),
     );
+  }
+}
+
+class NotificationsServices {
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  final AndroidInitializationSettings _androidInitializationSettings =
+      AndroidInitializationSettings('logo');
+
+  void initializeNotifications() async {
+    InitializationSettings initializationSettings = InitializationSettings(
+      android: _androidInitializationSettings,
+    );
+
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  void sendNotification(String title, String body) async {
+    AndroidNotificationDetails androidNotificationDetails =
+        AndroidNotificationDetails('channelId', 'channelName',
+            importance: Importance.max, priority: Priority.high);
+
+    NotificationDetails notificationDetails = NotificationDetails(
+      android: androidNotificationDetails,
+    );
+
+    await _flutterLocalNotificationsPlugin.show(
+        0, title, body, notificationDetails);
   }
 }
