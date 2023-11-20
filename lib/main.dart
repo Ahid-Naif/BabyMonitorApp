@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:math';
 
 void main() {
   runApp(MyApp());
@@ -25,6 +26,31 @@ class StreamAndRecordingsPage extends StatefulWidget {
   @override
   _StreamAndRecordingsPageState createState() =>
       _StreamAndRecordingsPageState();
+}
+
+class CustomBackground extends StatelessWidget {
+  final Widget child;
+
+  CustomBackground({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFeee0e0),
+            Color(0xFFc0b4c0),
+            Color(0xFF4c648f),
+          ],
+        ),
+      ),
+      child: child,
+    );
+  }
 }
 
 class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
@@ -192,77 +218,148 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    const double contentWidth = 640; // Define a fixed width for the content
+    double screenWidth =
+        MediaQuery.of(context).size.width; // Get the screen width
+
+    // Calculate horizontal margin while ensuring it's not negative
+    double horizontalMargin = max((screenWidth - contentWidth) / 2, 0);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-            'Recordings (${_recordings.length})'), // Display the count of recordings
-        actions: [
-          IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: _recordings.isNotEmpty
-                ? _deleteAllRecordings
-                : null, // Disable if no recordings
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _refresh,
-          ),
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: _navigateToSettings,
-          ),
-          Switch(
-            value: _isToggleOn,
-            onChanged: _handleToggle,
-            activeTrackColor: Colors.lightBlueAccent,
-            activeColor: Colors.lightBlue,
-            inactiveThumbColor:
-                Colors.grey, // Set the inactive thumb color to gray
-          ),
-          IconButton(
-            icon: Icon(Icons.exit_to_app),
-            onPressed: _signOut,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            width: 640,
-            height: 310,
-            child: WebView(
-              key: _webViewKey,
-              initialUrl: '$_baseUrl/video_feed',
-              javascriptMode: JavascriptMode.unrestricted,
-              onWebResourceError: (error) {
-                // Log the error and consider providing a way to reload the WebView
-                print("WebView error: ${error.description}");
-                _reloadWebView(); // Reload WebView on error
-              },
+        appBar: PreferredSize(
+          preferredSize:
+              Size.fromHeight(kToolbarHeight), // Standard AppBar height
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF172643),
+                  Color(0xFF3a5e86),
+                  Color(0xFFc37e79),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+            child: AppBar(
+              backgroundColor:
+                  Colors.transparent, // Makes AppBar background transparent
+              elevation: 0, // Removes shadow
+              title: Text(
+                  'Recordings (${_recordings.length})'), // Display the count of recordings
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: _recordings.isNotEmpty
+                      ? _deleteAllRecordings
+                      : null, // Disable if no recordings
+                ),
+                IconButton(
+                  icon: Icon(Icons.refresh),
+                  onPressed: _refresh,
+                ),
+                IconButton(
+                  icon: Icon(Icons.settings),
+                  onPressed: _navigateToSettings,
+                ),
+                Switch(
+                  value: _isToggleOn,
+                  onChanged: _handleToggle,
+                  activeTrackColor: Colors.lightBlueAccent,
+                  activeColor: Colors.lightBlue,
+                  inactiveThumbColor:
+                      Colors.grey, // Set the inactive thumb color to gray
+                ),
+                IconButton(
+                  icon: Icon(Icons.exit_to_app),
+                  onPressed: _signOut,
+                ),
+              ],
             ),
           ),
-          Expanded(
-            flex: 3,
-            child: ListView.builder(
-              itemCount: _recordings.length,
-              itemBuilder: (context, index) {
-                String videoUrl = '$_baseUrl/static/${_recordings[index]}';
-                return ListTile(
-                  title: Text('Recording ${index + 1}'),
-                  subtitle: Text(_recordings[index]),
-                  onTap: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (context) =>
-                          VideoPlaybackScreen(videoUrl: videoUrl),
-                    ));
+        ),
+        body: CustomBackground(
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10.0),
+                child: Container(
+                  width: contentWidth,
+                  height: 310,
+                  child: WebView(
+                    key: _webViewKey,
+                    initialUrl: '$_baseUrl/video_feed',
+                    javascriptMode: JavascriptMode.unrestricted,
+                    onWebResourceError: (error) {
+                      // Log the error and consider providing a way to reload the WebView
+                      print("WebView error: ${error.description}");
+                      _reloadWebView(); // Reload WebView on error
+                    },
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: ListView.builder(
+                  itemCount: _recordings.length + 1, // Increase count by 1
+                  itemBuilder: (context, index) {
+                    // Check if the current item is the first one
+                    if (index == 0) {
+                      return Container(
+                        width: contentWidth,
+                        margin: EdgeInsets.symmetric(
+                            vertical: 4.0, horizontal: horizontalMargin),
+                        padding: EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF3F3F3),
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Recordings: ${_recordings.length}',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: _recordings.isNotEmpty
+                                  ? _deleteAllRecordings
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      // Adjust index for the recordings list
+                      int recordingIndex = index - 1;
+                      String videoUrl =
+                          '$_baseUrl/static/${_recordings[recordingIndex]}';
+                      return Container(
+                        width: contentWidth,
+                        margin: EdgeInsets.symmetric(
+                            vertical: 4.0, horizontal: horizontalMargin),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF3F3F3),
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        child: ListTile(
+                          title: Text('Recording ${recordingIndex + 1}'),
+                          subtitle: Text(_recordings[recordingIndex]),
+                          onTap: () {
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (context) =>
+                                  VideoPlaybackScreen(videoUrl: videoUrl),
+                            ));
+                          },
+                        ),
+                      );
+                    }
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 }
 
@@ -295,8 +392,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Settings'),
+      appBar: PreferredSize(
+        preferredSize:
+            Size.fromHeight(kToolbarHeight), // Standard AppBar height
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF172643),
+                Color(0xFF3a5e86),
+                Color(0xFFc37e79),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: AppBar(
+            backgroundColor:
+                Colors.transparent, // Makes AppBar background transparent
+            elevation: 0,
+            title: Text('Settings'),
+          ),
+        ),
       ),
       body: Padding(
         padding: EdgeInsets.all(16.0),
@@ -311,15 +428,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
               keyboardType: TextInputType.number,
             ),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveSettings,
-              child: Text('Save'),
-            ),
+            gradientButton("Save", _saveSettings),
           ],
         ),
       ),
     );
   }
+}
+
+Widget gradientButton(String label, VoidCallback onPressed) {
+  return Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(30.0),
+      gradient: LinearGradient(
+        colors: [
+          Color(0xFF172643),
+          Color(0xFF3a5e86),
+          Color(0xFFc37e79),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+    ),
+    child: ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        primary: Colors.transparent,
+        onSurface: Colors.transparent,
+        shadowColor: Colors.transparent,
+        padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30.0),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: Colors.white),
+      ),
+    ),
+  );
+}
+
+Widget gradientIconFloatingButton(
+    VideoPlayerController controller, VoidCallback onPressed) {
+  return Container(
+    height: 56.0, // Standard FAB size
+    width: 56.0,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: LinearGradient(
+        colors: [
+          Color(0xFF172643),
+          Color(0xFF3a5e86),
+          Color(0xFFc37e79),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+    ),
+    child: FloatingActionButton(
+      onPressed: onPressed,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Icon(
+        controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+        color: Colors.white,
+      ),
+    ),
+  );
 }
 
 class VideoPlaybackScreen extends StatefulWidget {
@@ -355,8 +531,28 @@ class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Video Playback'),
+      appBar: PreferredSize(
+        preferredSize:
+            Size.fromHeight(kToolbarHeight), // Standard AppBar height
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF172643),
+                Color(0xFF3a5e86),
+                Color(0xFFc37e79),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: AppBar(
+            backgroundColor:
+                Colors.transparent, // Makes AppBar background transparent
+            elevation: 0, // Removes shadow
+            title: Text('Video Playback'),
+          ),
+        ),
       ),
       body: Center(
         child: _controller.value.isInitialized
@@ -366,20 +562,15 @@ class _VideoPlaybackScreenState extends State<VideoPlaybackScreen> {
               )
             : CircularProgressIndicator(),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            if (_controller.value.isPlaying) {
-              _controller.pause();
-            } else {
-              _controller.play();
-            }
-          });
-        },
-        child: Icon(
-          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-        ),
-      ),
+      floatingActionButton: gradientIconFloatingButton(_controller, () {
+        setState(() {
+          if (_controller.value.isPlaying) {
+            _controller.pause();
+          } else {
+            _controller.play();
+          }
+        });
+      }),
     );
   }
 }
@@ -470,19 +661,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        padding: EdgeInsets.symmetric(horizontal: 24.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFeee0e0),
-              Color(0xFFc0b4c0),
-              Color(0xFF4c648f)
-            ], // Light to dark gradient
-          ),
-        ),
+      body: CustomBackground(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
