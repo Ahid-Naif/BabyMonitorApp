@@ -659,7 +659,7 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Image.asset(
-                'assets/images/logo.png'), // Replace with your logo asset
+                'assets/images/app_icon.png'), // Replace with your logo asset
             SizedBox(height: 48.0),
             TextFormField(
               controller: _emailController,
