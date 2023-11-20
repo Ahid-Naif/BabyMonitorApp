@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Camera Stream and Recordings',
-      home: StreamAndRecordingsPage(),
+      home: LoginPage(),
     );
   }
 }
@@ -33,6 +33,7 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
   Key _webViewKey = UniqueKey();
   Timer? timer;
   NotificationsServices notificationsServices = NotificationsServices();
+  bool _isToggleOn = false;
 
   @override
   void initState() {
@@ -42,8 +43,30 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
     _startPeriodicCheck();
   }
 
+  void _handleToggle(bool value) async {
+    setState(() {
+      _isToggleOn = value;
+    });
+    await _sendToggleValueToServer(value);
+  }
+
+  Future<void> _sendToggleValueToServer(bool value) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/set-display-enabled'),
+        body: json.encode({'value': value}),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode != 200) {
+        print('Failed to update the server');
+      }
+    } catch (e) {
+      print("Error: $e");
+    }
+  }
+
   void _startPeriodicCheck() {
-    timer = Timer.periodic(Duration(seconds: 10), (Timer t) async {
+    timer = Timer.periodic(Duration(seconds: 2), (Timer t) async {
       try {
         var response = await http.get(Uri.parse('$_baseUrl/api/check-danger'));
         if (response.statusCode == 200 && json.decode(response.body) == true) {
@@ -66,7 +89,6 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
 
   void _deleteAllRecordings() async {
     // Implement the logic to send a request to the server to delete all recordings
-    // For example, an HTTP DELETE request
     try {
       final response =
           await http.delete(Uri.parse('$_baseUrl/api/delete_all_recordings'));
@@ -143,6 +165,13 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
     }
   }
 
+  void _signOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (context) => LoginPage()));
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -182,12 +211,25 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
             icon: Icon(Icons.settings),
             onPressed: _navigateToSettings,
           ),
+          Switch(
+            value: _isToggleOn,
+            onChanged: _handleToggle,
+            activeTrackColor: Colors.lightBlueAccent,
+            activeColor: Colors.lightBlue,
+            inactiveThumbColor:
+                Colors.grey, // Set the inactive thumb color to gray
+          ),
+          IconButton(
+            icon: Icon(Icons.exit_to_app),
+            onPressed: _signOut,
+          ),
         ],
       ),
       body: Column(
         children: [
-          Expanded(
-            flex: 2,
+          Container(
+            width: 640,
+            height: 310,
             child: WebView(
               key: _webViewKey,
               initialUrl: '$_baseUrl/video_feed',
@@ -368,5 +410,155 @@ class NotificationsServices {
 
     await _flutterLocalNotificationsPlugin.show(
         0, title, body, notificationDetails);
+  }
+}
+
+class LoginPage extends StatefulWidget {
+  @override
+  _LoginPageState createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  void _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+    if (isLoggedIn) {
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => StreamAndRecordingsPage()));
+    }
+  }
+
+  void _login() async {
+    String email = _emailController.text;
+    String password = _passwordController.text;
+
+    if (email == 'admin@admin.com' && password == 'Admin@123') {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => StreamAndRecordingsPage()));
+    } else {
+      // Show error message
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Error'),
+          content: Text('Incorrect credentials'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Okay'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        padding: EdgeInsets.symmetric(horizontal: 24.0),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFeee0e0),
+              Color(0xFFc0b4c0),
+              Color(0xFF4c648f)
+            ], // Light to dark gradient
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Image.asset(
+                'assets/images/logo.png'), // Replace with your logo asset
+            SizedBox(height: 48.0),
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                hintText: 'Email address',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            SizedBox(height: 12.0),
+            TextFormField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            SizedBox(height: 24.0),
+            Container(
+              width: double
+                  .infinity, // Ensure the container fills the width available
+              height: 50.0, // Fixed height for the button
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(
+                    30.0), // Same border radius as the button
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xFF172643),
+                    Color(0xFF3a5e86),
+                    Color(0xFFc37e79),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+              child: ElevatedButton(
+                onPressed: _login,
+                style: ElevatedButton.styleFrom(
+                  primary: Colors
+                      .transparent, // Make the button's background transparent
+                  onSurface: Colors
+                      .transparent, // Ensure the splash effect is also transparent
+                  shadowColor: Colors.transparent, // No shadow
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                  padding: EdgeInsets
+                      .zero, // Remove padding to avoid extra space for the gradient
+                ),
+                child: Text(
+                  'Log In',
+                  style: TextStyle(
+                    color: Colors.white, // Text color
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
