@@ -244,15 +244,8 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
               backgroundColor:
                   Colors.transparent, // Makes AppBar background transparent
               elevation: 0, // Removes shadow
-              title: Text(
-                  'Recordings (${_recordings.length})'), // Display the count of recordings
+              title: Text('KeepEyes'), // Display the count of recordings
               actions: [
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: _recordings.isNotEmpty
-                      ? _deleteAllRecordings
-                      : null, // Disable if no recordings
-                ),
                 IconButton(
                   icon: Icon(Icons.refresh),
                   onPressed: _refresh,
@@ -264,8 +257,8 @@ class _StreamAndRecordingsPageState extends State<StreamAndRecordingsPage> {
                 Switch(
                   value: _isToggleOn,
                   onChanged: _handleToggle,
-                  activeTrackColor: Colors.lightBlueAccent,
-                  activeColor: Colors.lightBlue,
+                  activeTrackColor: Color(0xFF3a5e86),
+                  activeColor: Color(0xFF2c4868),
                   inactiveThumbColor:
                       Colors.grey, // Set the inactive thumb color to gray
                 ),
